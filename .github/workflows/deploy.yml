@@ -20,6 +20,14 @@ jobs:
           node-version: 18
           cache: 'npm'
 
+      # Debug: List files in the repository
+      - name: List repository files
+        run: |
+          echo "Repository contents:"
+          ls -la
+          echo "Package.json contents:"
+          cat package.json
+
       # Fix dependency issues
       - name: Fix package.json
         run: |
@@ -49,14 +57,30 @@ jobs:
           echo "" >> v0-user-next.config.mjs
           echo "export default userConfig;" >> v0-user-next.config.mjs
           cat v0-user-next.config.mjs
+          
+          # Debug: Show next.config.mjs
+          echo "Current next.config.mjs:"
+          cat next.config.mjs
 
       # Create a .nojekyll file in the root to disable Jekyll processing
       - name: Create .nojekyll file
         run: touch .nojekyll
 
-      # Build the project
+      # Build the project with verbose output
       - name: Build
-        run: npm run build
+        run: |
+          echo "Running build with verbose output"
+          npm run build --verbose
+          
+          # Debug: Check if out directory was created
+          echo "Checking for out directory after build:"
+          ls -la
+          if [ -d "out" ]; then
+            echo "out directory exists, contents:"
+            ls -la out/
+          else
+            echo "out directory was not created by the build"
+          fi
 
       # Ensure out directory exists and add .nojekyll file
       - name: Prepare output directory
@@ -68,37 +92,62 @@ jobs:
           touch out/.nojekyll
           echo "Created .nojekyll file"
           
-          # Check if out directory is empty
-          if [ -z "$(ls -A out 2>/dev/null)" ] || [ ! -f "out/index.html" ]; then
-            echo "out directory is empty or missing index.html, checking for build output elsewhere"
+          # Check if out directory is empty or missing index.html
+          if [ ! -f "out/index.html" ]; then
+            echo "out directory is missing index.html"
             
+            # Check for other possible build output locations
             if [ -d ".next" ]; then
-              echo "Found .next directory"
+              echo "Found .next directory, contents:"
+              ls -la .next/
+              
               if [ -d ".next/static" ]; then
+                echo "Copying .next/static to out/"
                 cp -r .next/static out/
               fi
               
-              # Create a basic index.html if it doesn't exist
-              if [ ! -f "out/index.html" ]; then
-                echo "Creating basic index.html"
-                cp index.html out/ 2>/dev/null || echo "<html><head><title>Motivational Quote Generator</title></head><body><h1>Motivational Quote Generator</h1><p>Coming soon!</p></body></html>" > out/index.html
+              # Look for exported files in .next/server/pages
+              if [ -d ".next/server/pages" ]; then
+                echo "Found .next/server/pages, contents:"
+                ls -la .next/server/pages/
+                
+                # Try to find HTML files
+                HTML_FILES=$(find .next/server/pages -name "*.html" 2>/dev/null)
+                if [ -n "$HTML_FILES" ]; then
+                  echo "Found HTML files, copying to out/"
+                  for file in $HTML_FILES; do
+                    cp "$file" out/
+                  done
+                fi
               fi
-            elif [ -d "build" ]; then
-              echo "Found build directory"
-              cp -r build/* out/
-            elif [ -d "dist" ]; then
-              echo "Found dist directory"
-              cp -r dist/* out/
-            else
-              echo "No build output found, copying source files"
-              cp -r app components lib public out/ 2>/dev/null || true
-              cp index.html out/ 2>/dev/null || echo "<html><head><title>Motivational Quote Generator</title></head><body><h1>Motivational Quote Generator</h1><p>Coming soon!</p></body></html>" > out/index.html
+            fi
+            
+            # Check for app directory structure
+            if [ -d "app" ]; then
+              echo "Found app directory, contents:"
+              ls -la app/
+              
+              # Copy app directory to out as a fallback
+              echo "Copying app directory to out/"
+              cp -r app out/ 2>/dev/null || true
+            fi
+            
+            # Create a basic index.html if it still doesn't exist
+            if [ ! -f "out/index.html" ]; then
+              echo "Creating basic index.html"
+              echo "<html><head><title>Motivational Quote Generator</title></head><body><h1>Motivational Quote Generator</h1><p>This is a placeholder. The build process may not be correctly configured for static export.</p></body></html>" > out/index.html
             fi
           fi
           
           # List contents of out directory
-          echo "Contents of out directory:"
+          echo "Final contents of out directory:"
           ls -la out/
+          
+          # If index.html exists, show its contents
+          if [ -f "out/index.html" ]; then
+            echo "Contents of index.html:"
+            cat out/index.html
+          fi
 
       # Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
