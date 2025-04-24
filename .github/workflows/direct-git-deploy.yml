@@ -1,35 +1,23 @@
-name: Deploy to GitHub Pages
+name: Direct Git Deploy to GitHub Pages
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Setup Pages
-        uses: actions/configure-pages@v3
-      
-      - name: Create docs directory
+      - name: Create static site
         run: |
-          mkdir -p docs
+          mkdir -p site
           
-          # Create index.html in docs directory
-          cat > docs/index.html << 'EOF'
+          # Create index.html
+          cat > site/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -82,13 +70,8 @@ jobs:
                 width: 50px;
                 height: 50px;
                 border-radius: 50%;
-                animation: float 15s linear infinite;
                 z-index: 0;
                 box-shadow: 0 0 20px currentColor;
-              }
-              @keyframes float {
-                0% { transform: translate(0, 0); }
-                100% { transform: translate(calc(100vw - 100px), calc(100vh - 100px)); }
               }
             </style>
           </head>
@@ -105,8 +88,8 @@ jobs:
                 ball.className = 'ball';
                 
                 // Random position
-                const top = Math.random() * 100;
-                const left = Math.random() * 100;
+                const top = Math.random() * window.innerHeight;
+                const left = Math.random() * window.innerWidth;
                 
                 // Random color
                 const colors = ['#ff00ff', '#00ffff', '#ffff00', '#00ff00', '#ff0099', '#9D00FF'];
@@ -115,70 +98,80 @@ jobs:
                 // Random size
                 const size = Math.random() * 30 + 20;
                 
-                // Random animation duration
-                const duration = Math.random() * 20 + 10;
-                
-                // Random direction
-                const startX = Math.random() * window.innerWidth;
-                const startY = Math.random() * window.innerHeight;
-                const endX = Math.random() * window.innerWidth;
-                const endY = Math.random() * window.innerHeight;
-                
                 ball.style.color = color;
                 ball.style.background = color;
-                ball.style.top = `${startY}px`;
-                ball.style.left = `${startX}px`;
+                ball.style.top = `${top}px`;
+                ball.style.left = `${left}px`;
                 ball.style.width = `${size}px`;
                 ball.style.height = `${size}px`;
-                ball.style.animationDuration = `${duration}s`;
-                
-                // Create a unique animation for this ball
-                const styleSheet = document.styleSheets[0];
-                const animationName = `float-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-                const keyframes = `
-                  @keyframes ${animationName} {
-                    0% { transform: translate(0, 0); }
-                    25% { transform: translate(${Math.random() * 100}vw, ${Math.random() * 100}vh); }
-                    50% { transform: translate(${Math.random() * 100}vw, ${Math.random() * 100}vh); }
-                    75% { transform: translate(${Math.random() * 100}vw, ${Math.random() * 100}vh); }
-                    100% { transform: translate(0, 0); }
-                  }
-                `;
-                styleSheet.insertRule(keyframes, styleSheet.cssRules.length);
-                
-                ball.style.animation = `${animationName} ${duration}s linear infinite`;
                 
                 document.body.appendChild(ball);
+                
+                // Animate the ball
+                animateBall(ball);
+              }
+              
+              function animateBall(ball) {
+                // Random speed
+                const speedX = (Math.random() - 0.5) * 5;
+                const speedY = (Math.random() - 0.5) * 5;
+                
+                let posX = parseFloat(ball.style.left);
+                let posY = parseFloat(ball.style.top);
+                
+                function move() {
+                  posX += speedX;
+                  posY += speedY;
+                  
+                  // Bounce off walls
+                  if (posX <= 0 || posX >= window.innerWidth - parseFloat(ball.style.width)) {
+                    speedX = -speedX;
+                  }
+                  
+                  if (posY <= 0 || posY >= window.innerHeight - parseFloat(ball.style.height)) {
+                    speedY = -speedY;
+                  }
+                  
+                  ball.style.left = `${posX}px`;
+                  ball.style.top = `${posY}px`;
+                  
+                  requestAnimationFrame(move);
+                }
+                
+                move();
               }
               
               // Create 20 balls
               for (let i = 0; i < 20; i++) {
                 createBall();
               }
+              
+              // Handle window resize
+              window.addEventListener('resize', () => {
+                // Clear existing balls
+                document.querySelectorAll('.ball').forEach(ball => ball.remove());
+                
+                // Create new balls
+                for (let i = 0; i < 20; i++) {
+                  createBall();
+                }
+              });
             </script>
           </body>
           </html>
           EOF
           
           # Create .nojekyll file to disable Jekyll processing
-          touch docs/.nojekyll
+          touch site/.nojekyll
       
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./docs
-          destination: ./_site
-      
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v1
+        run: |
+          cd site
+          git init
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Deploy to GitHub Pages"
+          git branch -M gh-pages
+          git remote add origin https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          git push -f origin gh-pages
