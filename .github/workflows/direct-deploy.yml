@@ -1,0 +1,37 @@
+name: Direct Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Deploy to GitHub Pages
+        run: |
+          # Configure Git
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Create a new branch for deployment
+          git checkout --orphan gh-pages
+          
+          # Remove everything except index.html and .nojekyll
+          find . -mindepth 1 -not -name 'index.html' -not -name '.git' -not -name '.nojekyll' -delete
+          
+          # Create .nojekyll file if it doesn't exist
+          touch .nojekyll
+          
+          # Commit changes
+          git add index.html .nojekyll
+          git commit -m "Deploy to GitHub Pages"
+          
+          # Force push to gh-pages branch
+          git push -f origin gh-pages
