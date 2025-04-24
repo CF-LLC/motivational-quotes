@@ -14,10 +14,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Create deployment directory
+        run: mkdir -p deploy
+
       - name: Create static site
         run: |
-          # Create index.html
-          cat > index.html << 'EOF'
+          # Create index.html in the deploy directory
+          cat > deploy/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -160,22 +163,19 @@ jobs:
           EOF
           
           # Create .nojekyll file to disable Jekyll processing
-          touch .nojekyll
+          touch deploy/.nojekyll
+          
+          # Create a blank README to override the existing one
+          echo "# Motivational Quote Generator" > deploy/README.md
 
       - name: Deploy to GitHub Pages
         run: |
+          cd deploy
+          git init
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          
-          # Create a new branch for deployment
-          git checkout --orphan gh-pages
-          
-          # Remove everything except index.html and .nojekyll
-          git rm -rf .
-          git add index.html .nojekyll
-          
-          # Commit changes
+          git add .
           git commit -m "Deploy to GitHub Pages"
-          
-          # Force push to gh-pages branch
+          git branch -M gh-pages
+          git remote add origin https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
           git push -f origin gh-pages
