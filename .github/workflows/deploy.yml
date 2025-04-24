@@ -20,30 +20,8 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      # Debug: List files in the repository
-      - name: List repository files
-        run: |
-          echo "Repository contents:"
-          ls -la
-          echo "Package.json contents:"
-          cat package.json
-
-      # Fix dependency issues
-      - name: Fix package.json
-        run: |
-          npm pkg delete dependencies.react-day-picker || echo "No react-day-picker in dependencies"
-          npm pkg delete dependencies.date-fns || echo "No date-fns in dependencies"
-
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-
-      # Get repository name for basePath configuration
-      - name: Get repository name
-        id: repo-name
-        run: |
-          REPO_NAME=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 2)
-          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
-          echo "Repository name: $REPO_NAME"
 
       # Create v0-user-next.config.mjs with GitHub Pages settings
       - name: Create user Next.js config for GitHub Pages
@@ -57,96 +35,30 @@ jobs:
           echo "" >> v0-user-next.config.mjs
           echo "export default userConfig;" >> v0-user-next.config.mjs
           cat v0-user-next.config.mjs
-          
-          # Debug: Show next.config.mjs
-          echo "Current next.config.mjs:"
-          cat next.config.mjs
 
       # Create a .nojekyll file in the root to disable Jekyll processing
       - name: Create .nojekyll file
         run: touch .nojekyll
 
-      # Build the project with verbose output
+      # Build the project
       - name: Build
-        run: |
-          echo "Running build with verbose output"
-          npm run build --verbose
-          
-          # Debug: Check if out directory was created
-          echo "Checking for out directory after build:"
-          ls -la
-          if [ -d "out" ]; then
-            echo "out directory exists, contents:"
-            ls -la out/
-          else
-            echo "out directory was not created by the build"
-          fi
+        run: npm run build
 
       # Ensure out directory exists and add .nojekyll file
       - name: Prepare output directory
         run: |
           # Make sure the out directory exists
-          mkdir -p out
-          
-          # Add .nojekyll file to the out directory
-          touch out/.nojekyll
-          echo "Created .nojekyll file"
-          
-          # Check if out directory is empty or missing index.html
-          if [ ! -f "out/index.html" ]; then
-            echo "out directory is missing index.html"
+          if [ -d "out" ]; then
+            # Add .nojekyll file to the out directory
+            touch out/.nojekyll
+            echo "Created .nojekyll file in out directory"
             
-            # Check for other possible build output locations
-            if [ -d ".next" ]; then
-              echo "Found .next directory, contents:"
-              ls -la .next/
-              
-              if [ -d ".next/static" ]; then
-                echo "Copying .next/static to out/"
-                cp -r .next/static out/
-              fi
-              
-              # Look for exported files in .next/server/pages
-              if [ -d ".next/server/pages" ]; then
-                echo "Found .next/server/pages, contents:"
-                ls -la .next/server/pages/
-                
-                # Try to find HTML files
-                HTML_FILES=$(find .next/server/pages -name "*.html" 2>/dev/null)
-                if [ -n "$HTML_FILES" ]; then
-                  echo "Found HTML files, copying to out/"
-                  for file in $HTML_FILES; do
-                    cp "$file" out/
-                  done
-                fi
-              fi
-            fi
-            
-            # Check for app directory structure
-            if [ -d "app" ]; then
-              echo "Found app directory, contents:"
-              ls -la app/
-              
-              # Copy app directory to out as a fallback
-              echo "Copying app directory to out/"
-              cp -r app out/ 2>/dev/null || true
-            fi
-            
-            # Create a basic index.html if it still doesn't exist
-            if [ ! -f "out/index.html" ]; then
-              echo "Creating basic index.html"
-              echo "<html><head><title>Motivational Quote Generator</title></head><body><h1>Motivational Quote Generator</h1><p>This is a placeholder. The build process may not be correctly configured for static export.</p></body></html>" > out/index.html
-            fi
-          fi
-          
-          # List contents of out directory
-          echo "Final contents of out directory:"
-          ls -la out/
-          
-          # If index.html exists, show its contents
-          if [ -f "out/index.html" ]; then
-            echo "Contents of index.html:"
-            cat out/index.html
+            # List contents of out directory
+            echo "Contents of out directory:"
+            ls -la out/
+          else
+            echo "Error: out directory was not created by the build process"
+            exit 1
           fi
 
       # Deploy to GitHub Pages
