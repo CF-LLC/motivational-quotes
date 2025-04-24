@@ -58,16 +58,19 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Add .nojekyll file to the out directory
-      - name: Add .nojekyll to out directory
-        run: touch out/.nojekyll
-
-      # Ensure out directory exists with content
+      # Ensure out directory exists and add .nojekyll file
       - name: Prepare output directory
         run: |
-          if [ ! -d "out" ] || [ -z "$(ls -A out 2>/dev/null)" ]; then
-            echo "out directory is empty, checking for build output elsewhere"
-            mkdir -p out
+          # Make sure the out directory exists
+          mkdir -p out
+          
+          # Add .nojekyll file to the out directory
+          touch out/.nojekyll
+          echo "Created .nojekyll file"
+          
+          # Check if out directory is empty
+          if [ -z "$(ls -A out 2>/dev/null)" ] || [ ! -f "out/index.html" ]; then
+            echo "out directory is empty or missing index.html, checking for build output elsewhere"
             
             if [ -d ".next" ]; then
               echo "Found .next directory"
@@ -92,10 +95,6 @@ jobs:
               cp index.html out/ 2>/dev/null || echo "<html><head><title>Motivational Quote Generator</title></head><body><h1>Motivational Quote Generator</h1><p>Coming soon!</p></body></html>" > out/index.html
             fi
           fi
-          
-          # Create .nojekyll file
-          touch out/.nojekyll
-          echo "Created .nojekyll file"
           
           # List contents of out directory
           echo "Contents of out directory:"
