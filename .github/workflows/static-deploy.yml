@@ -1,0 +1,133 @@
+name: Static Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Create static HTML
+        run: |
+          mkdir -p out
+          cat > out/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Motivational Quote Generator</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+                margin: 0;
+                padding: 0;
+                background-color: #000;
+                color: #fff;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+                text-align: center;
+              }
+              .container {
+                max-width: 800px;
+                padding: 2rem;
+              }
+              h1 {
+                font-size: 2.5rem;
+                margin-bottom: 1.5rem;
+              }
+              p {
+                font-size: 1.25rem;
+                margin-bottom: 2rem;
+                line-height: 1.6;
+              }
+              .neon-text {
+                text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0ff, 0 0 20px #0ff, 0 0 25px #0ff;
+                animation: neon 1.5s ease-in-out infinite alternate;
+              }
+              @keyframes neon {
+                from {
+                  text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #0ff, 0 0 20px #0ff, 0 0 25px #0ff;
+                }
+                to {
+                  text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #f0f, 0 0 20px #f0f, 0 0 25px #f0f;
+                }
+              }
+              .ball {
+                position: absolute;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                animation: float 8s ease-in-out infinite;
+                z-index: -1;
+              }
+              @keyframes float {
+                0% { transform: translateY(0) translateX(0); }
+                25% { transform: translateY(-20px) translateX(20px); }
+                50% { transform: translateY(0) translateX(40px); }
+                75% { transform: translateY(20px) translateX(20px); }
+                100% { transform: translateY(0) translateX(0); }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="ball" style="background: #ff00ff; top: 20%; left: 20%;"></div>
+            <div class="ball" style="background: #00ffff; top: 30%; left: 70%; animation-delay: 1s;"></div>
+            <div class="ball" style="background: #ffff00; top: 70%; left: 30%; animation-delay: 2s;"></div>
+            <div class="ball" style="background: #00ff00; top: 60%; left: 80%; animation-delay: 3s;"></div>
+            <div class="container">
+              <h1 class="neon-text">Motivational Quote Generator</h1>
+              <p>This app is being deployed to GitHub Pages. Check back soon for the full interactive experience!</p>
+              <p>In the meantime, remember: <span class="neon-text">"The journey of a thousand miles begins with a single step."</span></p>
+            </div>
+            <script>
+              // Add more animated balls
+              function createBall() {
+                const ball = document.createElement('div');
+                ball.className = 'ball';
+                
+                // Random position
+                const top = Math.random() * 100;
+                const left = Math.random() * 100;
+                
+                // Random color
+                const colors = ['#ff00ff', '#00ffff', '#ffff00', '#00ff00', '#ff0099', '#9D00FF'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // Random size
+                const size = Math.random() * 30 + 20;
+                
+                // Random animation delay
+                const delay = Math.random() * 5;
+                
+                ball.style.background = color;
+                ball.style.top = `${top}%`;
+                ball.style.left = `${left}%`;
+                ball.style.width = `${size}px`;
+                ball.style.height = `${size}px`;
+                ball.style.animationDelay = `${delay}s`;
+                
+                document.body.appendChild(ball);
+              }
+              
+              // Create 10 more balls
+              for (let i = 0; i < 10; i++) {
+                createBall();
+              }
+            </script>
+          </body>
+          </html>
+          EOF
+      
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: out
+          clean: true
