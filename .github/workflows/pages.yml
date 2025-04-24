@@ -1,21 +1,35 @@
-name: Static Deploy to GitHub Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       
-      - name: Create static HTML
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      
+      - name: Create docs directory
         run: |
-          mkdir -p out
-          cat > out/index.html << 'EOF'
+          mkdir -p docs
+          
+          # Create index.html in docs directory
+          cat > docs/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -34,10 +48,13 @@ jobs:
                 align-items: center;
                 min-height: 100vh;
                 text-align: center;
+                overflow: hidden;
               }
               .container {
                 max-width: 800px;
                 padding: 2rem;
+                position: relative;
+                z-index: 1;
               }
               h1 {
                 font-size: 2.5rem;
@@ -65,30 +82,24 @@ jobs:
                 width: 50px;
                 height: 50px;
                 border-radius: 50%;
-                animation: float 8s ease-in-out infinite;
-                z-index: -1;
+                animation: float 15s linear infinite;
+                z-index: 0;
+                box-shadow: 0 0 20px currentColor;
               }
               @keyframes float {
-                0% { transform: translateY(0) translateX(0); }
-                25% { transform: translateY(-20px) translateX(20px); }
-                50% { transform: translateY(0) translateX(40px); }
-                75% { transform: translateY(20px) translateX(20px); }
-                100% { transform: translateY(0) translateX(0); }
+                0% { transform: translate(0, 0); }
+                100% { transform: translate(calc(100vw - 100px), calc(100vh - 100px)); }
               }
             </style>
           </head>
           <body>
-            <div class="ball" style="background: #ff00ff; top: 20%; left: 20%;"></div>
-            <div class="ball" style="background: #00ffff; top: 30%; left: 70%; animation-delay: 1s;"></div>
-            <div class="ball" style="background: #ffff00; top: 70%; left: 30%; animation-delay: 2s;"></div>
-            <div class="ball" style="background: #00ff00; top: 60%; left: 80%; animation-delay: 3s;"></div>
             <div class="container">
               <h1 class="neon-text">Motivational Quote Generator</h1>
               <p>This app is being deployed to GitHub Pages. Check back soon for the full interactive experience!</p>
               <p>In the meantime, remember: <span class="neon-text">"The journey of a thousand miles begins with a single step."</span></p>
             </div>
             <script>
-              // Add more animated balls
+              // Create neon colored balls
               function createBall() {
                 const ball = document.createElement('div');
                 ball.className = 'ball';
@@ -104,30 +115,70 @@ jobs:
                 // Random size
                 const size = Math.random() * 30 + 20;
                 
-                // Random animation delay
-                const delay = Math.random() * 5;
+                // Random animation duration
+                const duration = Math.random() * 20 + 10;
                 
+                // Random direction
+                const startX = Math.random() * window.innerWidth;
+                const startY = Math.random() * window.innerHeight;
+                const endX = Math.random() * window.innerWidth;
+                const endY = Math.random() * window.innerHeight;
+                
+                ball.style.color = color;
                 ball.style.background = color;
-                ball.style.top = `${top}%`;
-                ball.style.left = `${left}%`;
+                ball.style.top = `${startY}px`;
+                ball.style.left = `${startX}px`;
                 ball.style.width = `${size}px`;
                 ball.style.height = `${size}px`;
-                ball.style.animationDelay = `${delay}s`;
+                ball.style.animationDuration = `${duration}s`;
+                
+                // Create a unique animation for this ball
+                const styleSheet = document.styleSheets[0];
+                const animationName = `float-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                const keyframes = `
+                  @keyframes ${animationName} {
+                    0% { transform: translate(0, 0); }
+                    25% { transform: translate(${Math.random() * 100}vw, ${Math.random() * 100}vh); }
+                    50% { transform: translate(${Math.random() * 100}vw, ${Math.random() * 100}vh); }
+                    75% { transform: translate(${Math.random() * 100}vw, ${Math.random() * 100}vh); }
+                    100% { transform: translate(0, 0); }
+                  }
+                `;
+                styleSheet.insertRule(keyframes, styleSheet.cssRules.length);
+                
+                ball.style.animation = `${animationName} ${duration}s linear infinite`;
                 
                 document.body.appendChild(ball);
               }
               
-              // Create 10 more balls
-              for (let i = 0; i < 10; i++) {
+              // Create 20 balls
+              for (let i = 0; i < 20; i++) {
                 createBall();
               }
             </script>
           </body>
           </html>
           EOF
+          
+          # Create .nojekyll file to disable Jekyll processing
+          touch docs/.nojekyll
       
-      - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
         with:
-          folder: out
-          clean: true
+          source: ./docs
+          destination: ./_site
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
