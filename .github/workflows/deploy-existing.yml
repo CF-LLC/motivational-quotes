@@ -1,0 +1,38 @@
+name: Deploy Existing Files to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Create deployment directory
+        run: |
+          # Create a directory for deployment
+          mkdir -p deploy
+          
+          # Copy all files except .git and .github
+          rsync -av --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='.next' ./ deploy/
+          
+          # Create .nojekyll file to disable Jekyll processing
+          touch deploy/.nojekyll
+      
+      - name: Deploy to GitHub Pages
+        run: |
+          cd deploy
+          git init
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Deploy to GitHub Pages"
+          git branch -M gh-pages
+          git remote add origin https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+          git push -f origin gh-pages
