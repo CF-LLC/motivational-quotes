@@ -20,99 +20,49 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      # Debug: Check package.json build script
-      - name: Check package.json
-        run: |
-          echo "Checking package.json build script:"
-          grep -A 3 "scripts" package.json || echo "No scripts found"
-
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # Create v0-user-next.config.mjs with GitHub Pages settings
-      - name: Create user Next.js config for GitHub Pages
+      # Create a temporary next.config.js for GitHub Pages deployment
+      - name: Create deployment config
         run: |
-          echo "/** @type {import('next').NextConfig} */" > v0-user-next.config.mjs
-          echo "const userConfig = {" >> v0-user-next.config.mjs
-          echo "  output: 'export'," >> v0-user-next.config.mjs
-          echo "  basePath: '/motivational-quotes'," >> v0-user-next.config.mjs
-          echo "  assetPrefix: '/motivational-quotes/'," >> v0-user-next.config.mjs
-          echo "};" >> v0-user-next.config.mjs
-          echo "" >> v0-user-next.config.mjs
-          echo "export default userConfig;" >> v0-user-next.config.mjs
-          cat v0-user-next.config.mjs
+          cat > next.config.js << 'EOF'
+          /** @type {import('next').NextConfig} */
+          const nextConfig = {
+            output: 'export',
+            basePath: '/motivational-quotes',
+            assetPrefix: '/motivational-quotes/',
+            images: {
+              unoptimized: true,
+            },
+            eslint: {
+              ignoreDuringBuilds: true,
+            },
+            typescript: {
+              ignoreBuildErrors: true,
+            },
+          };
+          
+          module.exports = nextConfig;
+          EOF
 
       # Create a .nojekyll file in the root to disable Jekyll processing
       - name: Create .nojekyll file
         run: touch .nojekyll
 
-      # Try different build approaches
-      - name: Build with explicit export
-        run: |
-          echo "Trying different build approaches..."
-          
-          # First, try the standard build command
-          echo "Approach 1: Using npm run build"
-          npm run build || echo "Standard build failed, trying alternatives"
-          
-          # Check if out directory was created
-          if [ -d "out" ]; then
-            echo "Success! out directory was created"
-          else
-            echo "out directory not found, trying next build and export"
-            
-            # Try using next build and next export separately
-            echo "Approach 2: Using next build and next export"
-            npx next build && npx next export || echo "next build and export failed, trying alternatives"
-            
-            # Check if out directory was created
-            if [ -d "out" ]; then
-              echo "Success! out directory was created"
-            else
-              # Try creating the out directory and copying from .next
-              echo "Approach 3: Manually creating out directory from .next"
-              if [ -d ".next" ]; then
-                mkdir -p out
-                cp -r .next/static out/
-                
-                # Create a basic index.html if it doesn't exist
-                echo "<html><head><title>Motivational Quote Generator</title><meta http-equiv='refresh' content='0;url=/motivational-quotes'></head><body>Redirecting...</body></html>" > out/index.html
-                
-                echo "Manually created out directory with static assets"
-              else
-                echo "Error: Neither out nor .next directories were created"
-                exit 1
-              fi
-            fi
-          fi
-          
-          # List contents of the directory
-          echo "Current directory contents:"
-          ls -la
-          
-          # If out directory exists, list its contents
-          if [ -d "out" ]; then
-            echo "out directory contents:"
-            ls -la out/
-          fi
+      # Build the project
+      - name: Build
+        run: npm run build
 
       # Ensure out directory exists and add .nojekyll file
       - name: Prepare output directory
         run: |
-          # Make sure the out directory exists
           if [ -d "out" ]; then
-            # Add .nojekyll file to the out directory
             touch out/.nojekyll
             echo "Created .nojekyll file in out directory"
           else
-            # Create out directory if it doesn't exist
-            mkdir -p out
-            touch out/.nojekyll
-            
-            # Create a basic index.html with redirect
-            echo "<html><head><title>Motivational Quote Generator</title><meta http-equiv='refresh' content='0;url=/motivational-quotes'></head><body>Redirecting...</body></html>" > out/index.html
-            
-            echo "Created out directory with basic redirect"
+            echo "Error: out directory was not created by the build process"
+            exit 1
           fi
 
       # Deploy to GitHub Pages
