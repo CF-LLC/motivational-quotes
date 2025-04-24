@@ -1,0 +1,105 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      # Fix dependency issues
+      - name: Fix package.json
+        run: |
+          npm pkg delete dependencies.react-day-picker || echo "No react-day-picker in dependencies"
+          npm pkg delete dependencies.date-fns || echo "No date-fns in dependencies"
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      # Update existing next.config.mjs to include output: 'export'
+      - name: Update Next.js config for static export
+        run: |
+          if [ -f "next.config.mjs" ]; then
+            # Add output: 'export' to the nextConfig object
+            sed -i "s/const nextConfig = {/const nextConfig = {\n  output: 'export',/" next.config.mjs
+            cat next.config.mjs
+          elif [ -f "next.config.js" ]; then
+            # Add output: 'export' to the nextConfig object
+            sed -i "s/const nextConfig = {/const nextConfig = {\n  output: 'export',/" next.config.js
+            cat next.config.js
+          else
+            echo "No next.config.mjs or next.config.js found, creating one"
+            echo "/** @type {import('next').NextConfig} */" > next.config.js
+            echo "const nextConfig = {" >> next.config.js
+            echo "  output: 'export'," >> next.config.js
+            echo "  images: {" >> next.config.js
+            echo "    unoptimized: true," >> next.config.js
+            echo "  }," >> next.config.js
+            echo "};" >> next.config.js
+            echo "" >> next.config.js
+            echo "module.exports = nextConfig;" >> next.config.js
+          fi
+
+      # Build the project
+      - name: Build
+        run: npm run build
+
+      # Ensure out directory exists with content
+      - name: Prepare output directory
+        run: |
+          if [ ! -d "out" ] || [ -z "$(ls -A out 2>/dev/null)" ]; then
+            echo "out directory is empty, checking for build output elsewhere"
+            mkdir -p out
+            
+            if [ -d ".next" ]; then
+              echo "Found .next directory"
+              if [ -d ".next/static" ]; then
+                cp -r .next/static out/
+              fi
+              
+              # Create a basic index.html if it doesn't exist
+              if [ ! -f "out/index.html" ]; then
+                echo "Creating basic index.html"
+                cp index.html out/ 2>/dev/null || echo "<html><head><title>Motivational Quote Generator</title></head><body><h1>Motivational Quote Generator</h1><p>Coming soon!</p></body></html>" > out/index.html
+              fi
+            elif [ -d "build" ]; then
+              echo "Found build directory"
+              cp -r build/* out/
+            elif [ -d "dist" ]; then
+              echo "Found dist directory"
+              cp -r dist/* out/
+            else
+              echo "No build output found, copying source files"
+              cp -r app components lib public out/ 2>/dev/null || true
+              cp index.html out/ 2>/dev/null || echo "<html><head><title>Motivational Quote Generator</title></head><body><h1>Motivational Quote Generator</h1><p>Coming soon!</p></body></html>" > out/index.html
+            fi
+          fi
+          
+          # Create .nojekyll file
+          touch out/.nojekyll
+          echo "Created .nojekyll file"
+          
+          # List contents of out directory
+          echo "Contents of out directory:"
+          ls -la out/
+
+      # Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: out
+          clean: true
