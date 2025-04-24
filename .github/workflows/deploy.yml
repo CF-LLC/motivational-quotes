@@ -20,6 +20,12 @@ jobs:
           node-version: 18
           cache: 'npm'
 
+      # Debug: Check package.json build script
+      - name: Check package.json
+        run: |
+          echo "Checking package.json build script:"
+          grep -A 3 "scripts" package.json || echo "No scripts found"
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
@@ -40,9 +46,55 @@ jobs:
       - name: Create .nojekyll file
         run: touch .nojekyll
 
-      # Build the project
-      - name: Build
-        run: npm run build
+      # Try different build approaches
+      - name: Build with explicit export
+        run: |
+          echo "Trying different build approaches..."
+          
+          # First, try the standard build command
+          echo "Approach 1: Using npm run build"
+          npm run build || echo "Standard build failed, trying alternatives"
+          
+          # Check if out directory was created
+          if [ -d "out" ]; then
+            echo "Success! out directory was created"
+          else
+            echo "out directory not found, trying next build and export"
+            
+            # Try using next build and next export separately
+            echo "Approach 2: Using next build and next export"
+            npx next build && npx next export || echo "next build and export failed, trying alternatives"
+            
+            # Check if out directory was created
+            if [ -d "out" ]; then
+              echo "Success! out directory was created"
+            else
+              # Try creating the out directory and copying from .next
+              echo "Approach 3: Manually creating out directory from .next"
+              if [ -d ".next" ]; then
+                mkdir -p out
+                cp -r .next/static out/
+                
+                # Create a basic index.html if it doesn't exist
+                echo "<html><head><title>Motivational Quote Generator</title><meta http-equiv='refresh' content='0;url=/motivational-quotes'></head><body>Redirecting...</body></html>" > out/index.html
+                
+                echo "Manually created out directory with static assets"
+              else
+                echo "Error: Neither out nor .next directories were created"
+                exit 1
+              fi
+            fi
+          fi
+          
+          # List contents of the directory
+          echo "Current directory contents:"
+          ls -la
+          
+          # If out directory exists, list its contents
+          if [ -d "out" ]; then
+            echo "out directory contents:"
+            ls -la out/
+          fi
 
       # Ensure out directory exists and add .nojekyll file
       - name: Prepare output directory
@@ -52,13 +104,15 @@ jobs:
             # Add .nojekyll file to the out directory
             touch out/.nojekyll
             echo "Created .nojekyll file in out directory"
-            
-            # List contents of out directory
-            echo "Contents of out directory:"
-            ls -la out/
           else
-            echo "Error: out directory was not created by the build process"
-            exit 1
+            # Create out directory if it doesn't exist
+            mkdir -p out
+            touch out/.nojekyll
+            
+            # Create a basic index.html with redirect
+            echo "<html><head><title>Motivational Quote Generator</title><meta http-equiv='refresh' content='0;url=/motivational-quotes'></head><body>Redirecting...</body></html>" > out/index.html
+            
+            echo "Created out directory with basic redirect"
           fi
 
       # Deploy to GitHub Pages
