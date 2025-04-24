@@ -29,33 +29,38 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # Update existing next.config.mjs to include output: 'export'
-      - name: Update Next.js config for static export
+      # Get repository name for basePath configuration
+      - name: Get repository name
+        id: repo-name
         run: |
-          if [ -f "next.config.mjs" ]; then
-            # Add output: 'export' to the nextConfig object
-            sed -i "s/const nextConfig = {/const nextConfig = {\n  output: 'export',/" next.config.mjs
-            cat next.config.mjs
-          elif [ -f "next.config.js" ]; then
-            # Add output: 'export' to the nextConfig object
-            sed -i "s/const nextConfig = {/const nextConfig = {\n  output: 'export',/" next.config.js
-            cat next.config.js
-          else
-            echo "No next.config.mjs or next.config.js found, creating one"
-            echo "/** @type {import('next').NextConfig} */" > next.config.js
-            echo "const nextConfig = {" >> next.config.js
-            echo "  output: 'export'," >> next.config.js
-            echo "  images: {" >> next.config.js
-            echo "    unoptimized: true," >> next.config.js
-            echo "  }," >> next.config.js
-            echo "};" >> next.config.js
-            echo "" >> next.config.js
-            echo "module.exports = nextConfig;" >> next.config.js
-          fi
+          REPO_NAME=$(echo $GITHUB_REPOSITORY | cut -d '/' -f 2)
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+          echo "Repository name: $REPO_NAME"
+
+      # Create v0-user-next.config.mjs with GitHub Pages settings
+      - name: Create user Next.js config for GitHub Pages
+        run: |
+          echo "/** @type {import('next').NextConfig} */" > v0-user-next.config.mjs
+          echo "const userConfig = {" >> v0-user-next.config.mjs
+          echo "  output: 'export'," >> v0-user-next.config.mjs
+          echo "  basePath: '/motivational-quotes'," >> v0-user-next.config.mjs
+          echo "  assetPrefix: '/motivational-quotes/'," >> v0-user-next.config.mjs
+          echo "};" >> v0-user-next.config.mjs
+          echo "" >> v0-user-next.config.mjs
+          echo "export default userConfig;" >> v0-user-next.config.mjs
+          cat v0-user-next.config.mjs
+
+      # Create a .nojekyll file in the root to disable Jekyll processing
+      - name: Create .nojekyll file
+        run: touch .nojekyll
 
       # Build the project
       - name: Build
         run: npm run build
+
+      # Add .nojekyll file to the out directory
+      - name: Add .nojekyll to out directory
+        run: touch out/.nojekyll
 
       # Ensure out directory exists with content
       - name: Prepare output directory
